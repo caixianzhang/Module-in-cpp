@@ -2,13 +2,12 @@ CXX = g++
 CXXFLAGS = -O2 -g -Wall
 LDFLAGS = -lpthread
 
-OBJS = main.o net.o threadpool.o
+OBJS = *.cpp
 
 TARGET = module
 
 $(TARGET):$(OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
-	@rm -rf *.o
 
 .PHONY:clean
 clean:

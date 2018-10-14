@@ -43,13 +43,14 @@ void *single_pthread_work(void * arg)
 		self->task->func(self->task->arg);
 		free(self->task->arg);
 		self->task->arg = NULL;
+		
 		pthread_mutex_unlock(&self->task->mutex);
 		pthread_mutex_destroy(&self->task->mutex);
 
 		free(self->task);
 		self->task = NULL;
 		self->is_execute_task = 0;
-
+		
 		pthread_mutex_lock(&pthread_queue_idle->mutex);
 		if(pthread_queue_idle->pthread_queue_size == 0)
 		{
@@ -64,6 +65,7 @@ void *single_pthread_work(void * arg)
 			self->next = NULL;
 			pthread_queue_idle->rear = self;
 		}
+
 		pthread_queue_idle->pthread_queue_size++;
 		pthread_mutex_unlock(&pthread_queue_idle->mutex);
 		
@@ -115,8 +117,6 @@ int create_pthread_pool()
 			pthread_mutex_lock(&pre_pthread->mutex);
 			pre_pthread->next = next_pthread;
 			pthread_mutex_unlock(&pre_pthread->mutex);
-
-			next_pthread->next = NULL;
 
 			pthread_cond_init(&next_pthread->cond, NULL);
 			pthread_mutex_init(&next_pthread->mutex, NULL);
@@ -198,9 +198,6 @@ void *pthread_manager(void * arg)
 		temp_pthread->is_execute_task = 1;
 		temp_pthread->task = temp_task;
 		temp_pthread->next = NULL;
-		pthread_mutex_unlock(&temp_pthread->mutex);
-
-		pthread_mutex_lock(&temp_pthread->mutex);
 		pthread_cond_signal(&temp_pthread->cond);
 		pthread_mutex_unlock(&temp_pthread->mutex);
 	}
@@ -214,18 +211,17 @@ int init_pthread_pool()
 	pthread_queue_idle->head = pthread_queue_idle->rear = NULL;
 	pthread_mutex_init(&pthread_queue_idle->mutex, NULL);
 	pthread_cond_init(&pthread_queue_idle->cond, NULL);
+	
 	waiting_task_queue = (task_queue *)malloc(sizeof(task_queue));
 	waiting_task_queue->head = waiting_task_queue->rear = NULL;
 	waiting_task_queue->task_queue_size = 0;
 	pthread_mutex_init(&waiting_task_queue->mutex, NULL);
 	sem_init(&waiting_task_queue->NewTaskToExecute, 0, 0);
-	if(create_pthread_pool() == -1)
-	{
-		printf("threadpool.c, int init_pthread_pool():fail to init pthreadpool %m\n");
-		return -1;
-	}
-
+	
+	create_pthread_pool();
+	
 	pthread_create(&pthread_manager_pid, NULL, pthread_manager, NULL);
+	
 	return 0;
 }
 
@@ -235,6 +231,7 @@ int AddTaskToQueue(task_node * NewTask)
 	NewTask->pid = 0;
 	NewTask->is_work = 0;
 	NewTask->next = NULL;
+	
 	pthread_mutex_lock(&waiting_task_queue->mutex);
 	NewTask->work_id = waiting_task_queue->task_queue_size + 1;
 	if(NewTask->work_id > TASK_MAX_NUM)
@@ -269,11 +266,11 @@ int AddTaskToQueue(task_node * NewTask)
 
 void monitor_pthread_pool()
 {
-	pthread_detach(pthread_self());
 	int i = 0;
 	pthread_node *temp_pthread = NULL;
+	
 	pthread_mutex_lock(&pthread_queue_idle->mutex);
-	printf("threadpool.c, we have %d thread work!\n", pthread_pool_size -  pthread_queue_idle->pthread_queue_size);
+	//printf("threadpool.c, we have %d thread work!\n", pthread_pool_size -  pthread_queue_idle->pthread_queue_size);
 	if(pthread_queue_idle->pthread_queue_size >  THREAD_IDLE_REDUNDANCE_MAX)
 	{
 		while(pthread_queue_idle->pthread_queue_size > THREAD_IDLE_REDUNDANCE_MAX/2)
@@ -292,18 +289,15 @@ void monitor_pthread_pool()
 		if(pthread_queue_idle->pthread_queue_size == 0)
 		{
 			temp_pthread =(pthread_node *)malloc(sizeof(pthread_node));
-			if(temp_pthread == NULL)
-			{
-				printf("threadpool.c, void *monitor_pthread_pool(void *arg):fail to malloc new thread !\n");
-				return;
-			}
+			
 			temp_pthread->pid = 0;
 			temp_pthread->is_execute_task = 0;
 			temp_pthread->pthread_exit_flag = 0;
 			temp_pthread->task = NULL;
-
-			pthread_queue_idle->head = pthread_queue_idle->rear = temp_pthread;
 			temp_pthread->next = NULL;
+			
+			pthread_queue_idle->head = pthread_queue_idle->rear = temp_pthread;
+			
 
 			pthread_cond_init(&temp_pthread->cond, NULL);
 			pthread_mutex_init(&temp_pthread->mutex, NULL);
@@ -315,15 +309,12 @@ void monitor_pthread_pool()
 		for(i = 0; i < 10; i++)
 		{
 			temp_pthread = (pthread_node *)malloc(sizeof(pthread_node));
-			if(temp_pthread == NULL)
-			{
-				printf("threadpool.c, void monitor_pthread_pool():fail to malloc new thread!\n");
-				return;
-			}
+			
 			temp_pthread->pid = 0;
 			temp_pthread->is_execute_task = 0;
 			temp_pthread->pthread_exit_flag = 0;
 			temp_pthread->task = NULL;
+			temp_pthread->next = NULL;
 			
 			pthread_mutex_lock(&pthread_queue_idle->rear->mutex);
 			pthread_queue_idle->rear = temp_pthread;
@@ -337,7 +328,7 @@ void monitor_pthread_pool()
 		}
 	}else
 	{
-		printf("threadpool.c, void monitor_pthread_pool():threadpool work well!\n");
+		//printf("threadpool.c, void monitor_pthread_pool():threadpool work well!\n");
 	}
 	pthread_mutex_unlock(&pthread_queue_idle->mutex);
 }

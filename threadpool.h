@@ -3,7 +3,7 @@
 
 #include <semaphore.h>
 
-#define TASK_MAX_NUM	10
+#define TASK_MAX_NUM	100
 #define THREAD_IDLE_REDUNDANCE_MAX	50
 #define THREAD_IDLE_REDUNDANCE_MIN	3
 #define THREAD_DEF_NUM	20
